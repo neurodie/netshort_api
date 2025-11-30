@@ -1,74 +1,24 @@
 // server.js
 const express = require("express");
 const axios = require("axios");
-const { wrapper } = require("axios-cookiejar-support");
+// const { wrapper } = require("axios-cookiejar-support");
 const { CookieJar } = require("tough-cookie");
 const crypto = require("crypto");
-const cors = require("cors");
+
 const app = express();
 app.use(express.json());
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://dramakita-ochre.vercel.app"
-    ],
-    credentials: true,
-  })
-);
 
 // ==========================================
 // 0. CLIENT DENGAN COOKIE (mirip requests.Session())
 // ==========================================
 
 function createClient() {
-  const jar = new CookieJar();
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      timeout: 20000,
-    })
-  );
+  // client biasa aja
+  const client = axios.create({
+    timeout: 20000,
+    // baseURL: "https://xxxx", // kalau mau
+  });
   return client;
-}
-
-// ==========================================
-// RANDOM HELPERS
-// ==========================================
-
-function randomHex(len = 16) {
-  return crypto.randomBytes(len).toString("hex");
-}
-
-function randomAndroidModel() {
-  const models = [
-    "Pixel 6",
-    "Pixel 7",
-    "Pixel 8",
-    "Pixel 6a",
-    "Galaxy S21",
-    "Galaxy S22",
-    "Galaxy S23",
-    "Redmi Note 11",
-    "Redmi Note 12",
-    "ONEPLUS A6003",
-    "CPH2411",
-  ];
-  return models[Math.floor(Math.random() * models.length)];
-}
-
-function randomChromeVersion() {
-  const major = 85 + Math.floor(Math.random() * 15); // 85–99
-  const build = Math.floor(1000 + Math.random() * 8000);
-  return `${major}.0.${build}.120`;
-}
-
-function buildUserAgent() {
-  return (
-    `Mozilla/5.0 (Linux; Android 12; ${randomAndroidModel()} Build/SP1A.210812.015; wv) ` +
-    `AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/${randomChromeVersion()} Mobile Safari/537.36`
-  );
 }
 
 // ==========================================
@@ -110,12 +60,10 @@ T2kEP1E1h6OJOhEhETwVIUtcBzsK25ju9LqL89bC+W0uS7BPvk6Tcws/tXHCkQCTgb9jVXceZ2ox+
 6axvlW/5WgHt5Q=
 -----END PRIVATE KEY-----`;
 
-// DEVICE_CODE & USER_AGENT sekarang random per start server
-const DEVICE_CODE = randomHex(8); // 8 bytes = 16 hex chars
+const DEVICE_CODE = "231778b807f8b283";
 const APP_VER = "2.0.3";
 const BASE_URL = "https://appsecapi.netshort.com";
-const DEFAULT_AD_UNLOCK_CONFIG_ID = "1993944126552477698";
-const USER_AGENT = buildUserAgent();
+const DEFAULT_AD_UNLOCK_CONFIG_ID = "1993944126552477698"; // string biar gak di-rounding
 
 // ==========================================
 // 2. UTIL ENCRYPT / DECRYPT
@@ -123,10 +71,9 @@ const USER_AGENT = buildUserAgent();
 
 function genAesKey(length = 32) {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = crypto.randomBytes(length);
   let result = "";
   for (let i = 0; i < length; i++) {
-    result += alphabet[bytes[i] % alphabet.length];
+    result += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return result;
 }
@@ -213,7 +160,9 @@ async function doLogin(client) {
     Host: "appsecapi.netshort.com",
     Canary: "v2",
     Os: "1",
-    "User-Agent": USER_AGENT,
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 12; sdk_gphone64_x86_64 Build/SE1A.220826.008; wv) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Mobile Safari/537.36",
     Start_type: "cold",
     Version: APP_VER,
     Network: "wifi,cold,true",
@@ -251,7 +200,7 @@ async function doLogin(client) {
 async function getShortplayDetail(client, token, shortPlayId) {
   const url = BASE_URL + "/prod-app-api/video/shortPlay/base/detail_info/V2";
 
-  const requestData = { shortPlayId };
+  const requestData = { shortPlayId }; // boleh string, server nerima
 
   const { bodyB64, headerKeyB64 } = encryptRequestPayload(requestData);
   const ts = Date.now().toString();
@@ -260,7 +209,9 @@ async function getShortplayDetail(client, token, shortPlayId) {
     Host: "appsecapi.netshort.com",
     Canary: "v2",
     Os: "1",
-    "User-Agent": USER_AGENT,
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 12; sdk_gphone64_x86_64 Build/SE1A.220826.008; wv) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Mobile Safari/537.36",
     Start_type: "cold",
     Version: APP_VER,
     Network: "wifi,cold,true",
@@ -295,51 +246,6 @@ async function getShortplayDetail(client, token, shortPlayId) {
   }));
 
   return { meta: result.data, episodes, raw: result };
-}
-
-// ==========================================
-// 4.5. HOME TAB → /video/shortPlay/tab/load_group_tabId
-// (port dari main() Python kamu)
-// ==========================================
-
-async function getHomeTabGroup(client, token, tabId, offset = 0, limit = 1) {
-  const url = BASE_URL + "/prod-app-api/video/shortPlay/tab/load_group_tabId";
-
-  // tabId besar → kirim sebagai string di JSON manual biar ga overflow
-  const tabIdStr = String(tabId);
-  const off = Number(offset) || 0;
-  const lim = Number(limit) || 1;
-
-  const payloadStr =
-    `{"tabId":${tabIdStr},` + `"offset":${off},` + `"limit":${lim}}`;
-
-  const { bodyB64, headerKeyB64 } = encryptRequestPayload(payloadStr);
-  const ts = Date.now().toString();
-
-  const headers = {
-    Host: "appsecapi.netshort.com",
-    Canary: "v2",
-    Os: "1",
-    Version: APP_VER,
-    "Encrypt-Key": headerKeyB64,
-    "Device-Code": DEVICE_CODE,
-    "Content-Type": "application/json",
-    "Content-Language": "id_ID",
-    "User-Agent": USER_AGENT,
-    Authorization: `Bearer ${token}`,
-  };
-
-  const resp = await client.post(url, bodyB64, { headers });
-
-  const serverKey = resp.headers["encrypt-key"];
-  if (!serverKey)
-    throw new Error("getHomeTabGroup: encrypt-key header tidak ada");
-
-  const body =
-    typeof resp.data === "string" ? resp.data.trim() : String(resp.data).trim();
-  const result = decryptResponsePayload(serverKey, body);
-
-  return result; // full JSON hasil dekripsi
 }
 
 // ==========================================
@@ -380,7 +286,9 @@ async function getEpisodeDetail(
     Push_switch: "true",
     "Content-Language": "en_US",
     "Content-Type": "application/json",
-    "User-Agent": USER_AGENT,
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 12; wv) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 Mobile Safari/537.36",
     "Encrypt-Key": headerKeyB64,
     Authorization: `Bearer ${token}`,
     Timestamp: ts,
@@ -396,18 +304,10 @@ async function getEpisodeDetail(
   const result = decryptResponsePayload(serverKey, body);
 
   const data = result.data || {};
+  const possibleVideo =
+    data.playVoucher || data.videoUrl || data.playUrl || null;
 
-  let possibleVideo = null;
-
-  if (Array.isArray(data.episodeList) && data.episodeList.length > 0) {
-    const first = data.episodeList[0];
-    possibleVideo =
-      first.playVoucher || first.videoUrl || first.playUrl || null;
-  } else {
-    possibleVideo = data.playVoucher || data.videoUrl || data.playUrl || null;
-  }
-
-  return { data, possibleVideo };
+  return { result, possibleVideo };
 }
 
 // ==========================================
@@ -444,7 +344,10 @@ async function unlockAdEpisode(
     Host: "appsecapi.netshort.com",
     Canary: "v2",
     Os: "1",
-    "User-Agent": USER_AGENT,
+    "User-Agent":
+      "Mozilla/5.0 (Linux; Android 12; sdk_gphone64_x86_64 Build/SE1A.220826.008; wv) " +
+      "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/91.0.4472.114 " +
+      "Mobile Safari/537.36",
     Start_type: "cold",
     Version: APP_VER,
     Network: "wifi,cold,true",
@@ -488,44 +391,18 @@ app.post("/api/login", async (req, res) => {
 });
 
 /**
- * GET /api/get-home?tabId=1965372594714603522&offset=0&limit=1
+ * GET /api/getepisode/:shortPlayId/:episodeNo
  *
- * Port dari main() Python:
- * - login dulu
- * - hit /video/shortPlay/tab/load_group_tabId
- */
-app.get("/api/get-home", async (req, res) => {
-  const { tabId, offset = "0", limit = "1" } = req.query;
-
-  if (!tabId) {
-    return res.status(400).json({ error: "tabId wajib diisi" });
-  }
-
-  const client = createClient();
-
-  try {
-    const { token } = await doLogin(client);
-    const result = await getHomeTabGroup(client, token, tabId, offset, limit);
-
-    return res.json({
-      ok: true,
-      request: {
-        tabId: String(tabId),
-        offset: Number(offset) || 0,
-        limit: Number(limit) || 1,
-      },
-      data: result, // full JSON hasil decrypt
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message || "get-home error" });
-  }
-});
-
-/**
- * GET /api/getepisode/:shortPlayId
+ * Contoh:
+ *  /api/getepisode/1928285625898315778/30
  *
- * -> ambil daftar episode (sekali doang, lebih berat)
+ * Flow:
+ *  1) login
+ *  2) detail_info/V2 -> ambil list episode
+ *  3) cari episode dengan episodeNo = param
+ *  4) unlock ad
+ *  5) get_episode lagi
+ *  6) return videoUrl
  */
 app.get("/api/getepisode/:shortPlayId", async (req, res) => {
   const shortPlayId = req.params.shortPlayId;
@@ -545,6 +422,7 @@ app.get("/api/getepisode/:shortPlayId", async (req, res) => {
       shortPlayId,
       title: detail.meta?.shortPlayName || null,
       cover: detail.meta?.shortPlayCover || null,
+
       episodeCount: detail.episodes.length,
       episodes: detail.episodes, // berisi episodeNo + episodeId
       raw: detail.meta,
@@ -555,43 +433,17 @@ app.get("/api/getepisode/:shortPlayId", async (req, res) => {
   }
 });
 
-/**
- * GET /api/getepisode/:shortPlayId/:episodeId
- *
- * Contoh:
- *   /api/getepisode/1928285625898315778/1934502729310863362?episodeNo=6&playClarity=540p
- *
- * Flow:
- *   1) login
- *   2) unlock_ad_episode
- *   3) getEpisodeDetail (setelah unlock)
- */
-app.get("/api/getepisode/:shortPlayId/:episodeId", async (req, res) => {
+app.get("/api/getepisode/:shortPlayId/:episodeNo", async (req, res) => {
   const shortPlayId = req.params.shortPlayId;
-  const episodeId = req.params.episodeId;
-
-  const episodeNoParam = req.query.episodeNo;
+  const episodeNoParam = req.params.episodeNo;
   const playClarity = req.query.playClarity || "540p";
   const adUnlockConfigId = req.query.adUnlockConfigId;
 
-  if (!shortPlayId || !episodeId) {
-    return res.status(400).json({
-      error:
-        "shortPlayId dan episodeId wajib diisi, contoh: /api/getepisode/1928.../1934...",
-    });
-  }
-
-  if (!episodeNoParam) {
-    return res.status(400).json({
-      error:
-        "episodeNo wajib dikirim via query, contoh: ?episodeNo=6 (ambil dari detail_info/V2 di frontend)",
-    });
-  }
-
   const epNo = Number(episodeNoParam);
-  if (Number.isNaN(epNo)) {
+  if (!shortPlayId || Number.isNaN(epNo)) {
     return res.status(400).json({
-      error: "episodeNo harus berupa angka, contoh: ?episodeNo=6",
+      error:
+        "shortPlayId dan episodeNo wajib diisi, contoh: /api/getepisode/1928.../30",
     });
   }
 
@@ -606,7 +458,31 @@ app.get("/api/getepisode/:shortPlayId/:episodeId", async (req, res) => {
     // 1) LOGIN
     const { token } = await doLogin(client);
 
-    // 3) UNLOCK via AD
+    // 2) DETAIL_INFO/V2 -> AMBIL LIST EPISODE
+    const detail = await getShortplayDetail(client, token, shortPlayId);
+    const episodes = detail.episodes || [];
+
+    const targetEp = episodes.find((ep) => ep.episodeNo === epNo);
+    if (!targetEp) {
+      return res.status(404).json({
+        error: "episodeNo tidak ditemukan di shortPlay ini",
+        availableEpisodes: episodes.map((e) => e.episodeNo),
+      });
+    }
+
+    const episodeId = targetEp.episodeId;
+
+    // 3) GET EPISODE (before unlock)
+    const before = await getEpisodeDetail(
+      client,
+      token,
+      shortPlayId,
+      epNo,
+      episodeId,
+      playClarity
+    );
+
+    // 4) UNLOCK
     const unlockResult = await unlockAdEpisode(
       client,
       token,
@@ -616,7 +492,9 @@ app.get("/api/getepisode/:shortPlayId/:episodeId", async (req, res) => {
       configId,
       1
     );
-    const done2 = await getEpisodeDetail(
+
+    // 5) GET EPISODE (after unlock)
+    const after = await getEpisodeDetail(
       client,
       token,
       shortPlayId,
@@ -625,8 +503,7 @@ app.get("/api/getepisode/:shortPlayId/:episodeId", async (req, res) => {
       playClarity
     );
 
-    const videoUrl =
-      done2.data?.episodeList?.[0]?.playVoucher || done2.possibleVideo || null;
+    const videoUrl = after?.possibleVideo || before?.possibleVideo || null;
 
     return res.json({
       ok: true,
@@ -637,7 +514,12 @@ app.get("/api/getepisode/:shortPlayId/:episodeId", async (req, res) => {
       configId,
       videoUrl,
       unlockResult,
-      done2,
+      debug: {
+        episodesCount: episodes.length,
+        availableEpisodes: episodes.map((e) => e.episodeNo),
+        before,
+        after,
+      },
     });
   } catch (err) {
     console.error(err);
