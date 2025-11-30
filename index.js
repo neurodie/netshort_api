@@ -1,7 +1,6 @@
 // server.js
 const express = require("express");
 const axios = require("axios");
-const { wrapper } = require("axios-cookiejar-support");
 const { CookieJar } = require("tough-cookie");
 const crypto = require("crypto");
 
@@ -13,17 +12,13 @@ app.use(express.json());
 // ==========================================
 
 function createClient() {
-  const jar = new CookieJar();
-  const client = wrapper(
-    axios.create({
-      jar,
-      withCredentials: true,
-      timeout: 20000,
-    })
-  );
+  // client biasa aja
+  const client = axios.create({
+    timeout: 20000,
+    // baseURL: "https://xxxx", // kalau mau
+  });
   return client;
 }
-
 // ==========================================
 // RANDOM HELPERS
 // ==========================================
