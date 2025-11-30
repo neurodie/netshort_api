@@ -9,8 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: "http://localhost:5173", // atau "*" kalau mau bebas
-    credentials: true, // kalau kamu pakai cookie / auth
+    origin: "http://localhost:5173","https://dramakita-ochre.vercel.app/", // atau "*" kalau mau bebas  // kalau kamu pakai cookie / auth
   })
 );
 // ==========================================
