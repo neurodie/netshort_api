@@ -3,9 +3,23 @@ const express = require("express");
 const axios = require("axios");
 const { CookieJar } = require("tough-cookie");
 const crypto = require("crypto");
-
+const cors = require("cors");
 const app = express();
 app.use(express.json());
+
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "https://d23dbc702e41.ngrok-free.app",
+  "http://127.0.0.1:5173",
+  "https://dramakita-ochre.vercel.app",
+];
+
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS,
+    credentials: true,
+  })
+);
 
 // ==========================================
 // 0. CLIENT DENGAN COOKIE (mirip requests.Session())
